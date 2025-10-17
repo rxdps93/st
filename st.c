@@ -43,9 +43,6 @@
 #define ISCONTROLC1(c)		(BETWEEN(c, 0x80, 0x9f))
 #define ISCONTROL(c)		(ISCONTROLC0(c) || ISCONTROLC1(c))
 #define ISDELIM(u)		(u && wcschr(worddelimiters, u))
-#define TLINE(y)		((y) < term.scr ? term.hist[((y) + term.histi - \
-            term.scr + HISTSIZE + 1) % HISTSIZE] : \
-            term.line[(y) - term.scr])
 
 #define TSCREEN term.screen[IS_SET(MODE_ALTSCREEN)]
 #define TLINEOFFSET(y) (((y) + TSCREEN.cur - TSCREEN.off + TSCREEN.size) % TSCREEN.size)
@@ -1127,39 +1124,6 @@ kscrolldown(const Arg *a)
 }
 
 void
-kscrolldown(const Arg* a)
-{
-	int n = a->i;
-
-	if (n < 0)
-		n = term.row + n;
-
-	if (n > term.scr)
-		n = term.scr;
-
-	if (term.scr > 0) {
-		term.scr -= n;
-		selscroll(0, -n);
-		tfulldirt();
-	}
-}
-
-void
-kscrollup(const Arg* a)
-{
-	int n = a->i;
-
-	if (n < 0)
-		n = term.row + n;
-
-	if (term.scr <= HISTSIZE-n) {
-		term.scr += n;
-		selscroll(0, n);
-		tfulldirt();
-	}
-}
-
-void
 tscrolldown(int orig, int n, int copyhist)
 {
 	int i;
@@ -1170,8 +1134,8 @@ tscrolldown(int orig, int n, int copyhist)
 	if (copyhist) {
 		term.histi = (term.histi - 1 + HISTSIZE) % HISTSIZE;
 		temp = term.hist[term.histi];
-		term.hist[term.histi] = term.line[term.bot];
-		term.line[term.bot] = temp;
+		term.hist[term.histi] = term.screen[0].buffer[term.bot];
+		term.screen[0].buffer[term.bot] = temp;
 	}
 
 	/* Ensure that lines are allocated */
@@ -1211,8 +1175,8 @@ tscrollup(int orig, int n, int copyhist)
 	if (copyhist) {
 		term.histi = (term.histi + 1) % HISTSIZE;
 		temp = term.hist[term.histi];
-		term.hist[term.histi] = term.line[orig];
-		term.line[orig] = temp;
+		term.hist[term.histi] = term.screen[0].buffer[orig];
+		term.screen[0].buffer[orig] = temp;
 	}
 
 	if (term.scr > 0 && term.scr < HISTSIZE)
@@ -2872,8 +2836,8 @@ draw(void)
 
 	drawregion(0, 0, term.col, term.row);
 	if (TSCREEN.off == 0)
-		xdrawcursor(cx, term.c.y, TLINE[term.c.y][cx],
-				term.ocx, term.ocy, TLINE[term.ocy][term.ocx]);
+		xdrawcursor(cx, term.c.y, TLINE(term.c.y)[cx],
+				term.ocx, term.ocy, TLINE(term.ocy)[term.ocx]);
 	term.ocx = cx;
 	term.ocy = term.c.y;
 	xfinishdraw();
