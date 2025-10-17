@@ -35,7 +35,6 @@
 #define ESC_ARG_SIZ   16
 #define STR_BUF_SIZ   ESC_BUF_SIZ
 #define STR_ARG_SIZ   ESC_ARG_SIZ
-#define HISTSIZE      2000
 
 /* macros */
 #define IS_SET(flag)		((term.mode & (flag)) != 0)
@@ -116,22 +115,19 @@ typedef struct {
 
 /* Screen lines */
 typedef struct {
-	Line* buffer;	/* ring buffer */
-	int size;	/* size of buffer */
-	int cur;	/* start of active screen */
-	int off;	/* scrollback line offset */
-	TCursor sc;	/* saved cursor */
+	Line* buffer;  /* ring buffer */
+	int size;      /* size of buffer */
+	int cur;       /* start of active screen */
+	int off;       /* scrollback line offset */
+	TCursor sc;    /* saved cursor */
 } LineBuffer;
 
 /* Internal representation of the screen */
 typedef struct {
 	int row;      /* nb row */
 	int col;      /* nb col */
-	LineBuffer screen[2];   /* screen and alternate screen */
-	int linelen;    /* allocated line length */
-	Line hist[HISTSIZE]; /* history buffer */
-	int histi;    /* history index */
-	int scr;      /* scroll back */
+	LineBuffer screen[2]; /* screen and alternate screen */
+	int linelen;  /* allocated line length */
 	int *dirty;   /* dirtyness of lines */
 	TCursor c;    /* cursor */
 	int ocx;      /* old cursor col */
@@ -202,8 +198,8 @@ static void tnewline(int);
 static void tputtab(int);
 static void tputc(Rune);
 static void treset(void);
-static void tscrollup(int, int, int);
-static void tscrolldown(int, int, int);
+static void tscrollup(int, int);
+static void tscrolldown(int, int);
 static void tsetattr(const int *, int);
 static void tsetchar(Rune, const Glyph *, int, int);
 static void tsetdirt(int, int);
@@ -864,9 +860,6 @@ void
 ttywrite(const char *s, size_t n, int may_echo)
 {
 	const char *next;
-	Arg arg = (Arg) { .i = term.scr };
-
-	kscrolldown(&arg);
 
 	if (may_echo && IS_SET(MODE_ECHO))
 		twrite(s, n, 1);
@@ -1094,14 +1087,14 @@ tswapscreen(void)
 void
 kscrollup(const Arg *a)
 {
-	float n = a->f;
+	int n = a->i;
 
 	if (IS_SET(MODE_ALTSCREEN))
 		return;
 
-	if (n < 0) n = MAX((-n) * term.row, 1);
+	if (n < 0) n = (-n) * term.row;
 	if (n > TSCREEN.size - term.row - TSCREEN.off) n = TSCREEN.size - term.row - TSCREEN.off;
-	while (!TLINE((int)-n)) --n;
+	while (!TLINE(-n)) --n;
 	TSCREEN.off += n;
 	selscroll(0, n);
 	tfulldirt();
@@ -1111,12 +1104,12 @@ void
 kscrolldown(const Arg *a)
 {
 
-	float n = a->f;
+	int n = a->i;
 
 	if (IS_SET(MODE_ALTSCREEN))
 		return;
 
-	if (n < 0) n = MAX((-n) * term.row, 1);
+	if (n < 0) n = (-n) * term.row;
 	if (n > TSCREEN.off) n = TSCREEN.off;
 	TSCREEN.off -= n;
 	selscroll(0, -n);
@@ -1124,19 +1117,12 @@ kscrolldown(const Arg *a)
 }
 
 void
-tscrolldown(int orig, int n, int copyhist)
+tscrolldown(int orig, int n)
 {
 	int i;
 	Line temp;
 
 	LIMIT(n, 0, term.bot-orig+1);
-
-	if (copyhist) {
-		term.histi = (term.histi - 1 + HISTSIZE) % HISTSIZE;
-		temp = term.hist[term.histi];
-		term.hist[term.histi] = term.screen[0].buffer[term.bot];
-		term.screen[0].buffer[term.bot] = temp;
-	}
 
 	/* Ensure that lines are allocated */
 	for (i = -n; i < 0; i++) {
@@ -1165,22 +1151,12 @@ tscrolldown(int orig, int n, int copyhist)
 }
 
 void
-tscrollup(int orig, int n, int copyhist)
+tscrollup(int orig, int n)
 {
 	int i;
 	Line temp;
 
 	LIMIT(n, 0, term.bot-orig+1);
-
-	if (copyhist) {
-		term.histi = (term.histi + 1) % HISTSIZE;
-		temp = term.hist[term.histi];
-		term.hist[term.histi] = term.screen[0].buffer[orig];
-		term.screen[0].buffer[orig] = temp;
-	}
-
-	if (term.scr > 0 && term.scr < HISTSIZE)
-		term.scr = MIN(term.scr + n, HISTSIZE-1);
 
 	/* Ensure that lines are allocated */
 	for (i = term.row; i < term.row + n; i++) {
@@ -1193,7 +1169,7 @@ tscrollup(int orig, int n, int copyhist)
 		TLINE(i) = TLINE(i+n);
 		TLINE(i+n) = temp;
 	}
-	for (i = term.row-1; i > term.bot; i--) {
+	for (i = term.row-1; i >term.bot; i--) {
 		temp = TLINE(i);
 		TLINE(i) = TLINE(i+n);
 		TLINE(i+n) = temp;
@@ -1234,7 +1210,7 @@ tnewline(int first_col)
 	int y = term.c.y;
 
 	if (y == term.bot) {
-		tscrollup(term.top, 1, 1);
+		tscrollup(term.top, 1);
 	} else {
 		y++;
 	}
@@ -1405,14 +1381,14 @@ void
 tinsertblankline(int n)
 {
 	if (BETWEEN(term.c.y, term.top, term.bot))
-		tscrolldown(term.c.y, n, 0);
+		tscrolldown(term.c.y, n);
 }
 
 void
 tdeleteline(int n)
 {
 	if (BETWEEN(term.c.y, term.top, term.bot))
-		tscrollup(term.c.y, n, 0);
+		tscrollup(term.c.y, n);
 }
 
 int32_t
@@ -1856,11 +1832,11 @@ csihandle(void)
 	case 'S': /* SU -- Scroll <n> line up */
 		if (csiescseq.priv) break;
 		DEFAULT(csiescseq.arg[0], 1);
-		tscrollup(term.top, csiescseq.arg[0], 0);
+		tscrollup(term.top, csiescseq.arg[0]);
 		break;
 	case 'T': /* SD -- Scroll <n> line down */
 		DEFAULT(csiescseq.arg[0], 1);
-		tscrolldown(term.top, csiescseq.arg[0], 0);
+		tscrolldown(term.top, csiescseq.arg[0]);
 		break;
 	case 'L': /* IL -- Insert <n> blank lines */
 		DEFAULT(csiescseq.arg[0], 1);
@@ -2449,7 +2425,7 @@ eschandle(uchar ascii)
 		return 0;
 	case 'D': /* IND -- Linefeed */
 		if (term.c.y == term.bot) {
-			tscrollup(term.top, 1, 1);
+			tscrollup(term.top, 1);
 		} else {
 			tmoveto(term.c.x, term.c.y+1);
 		}
@@ -2462,7 +2438,7 @@ eschandle(uchar ascii)
 		break;
 	case 'M': /* RI -- Reverse index */
 		if (term.c.y == term.top) {
-			tscrolldown(term.top, 1, 1);
+			tscrolldown(term.top, 1);
 		} else {
 			tmoveto(term.c.x, term.c.y-1);
 		}
@@ -2722,7 +2698,7 @@ tresize(int col, int row)
 		return;
 	}
 
-	/* Shift buffer to keep cursor where we expect it */
+	/* Shift buffer to keep the cursor where we expect it */
 	if (row <= term.c.y) {
 		term.screen[0].cur = (term.screen[0].cur - row + term.c.y + 1) % term.screen[0].size;
 	}
@@ -2740,9 +2716,9 @@ tresize(int col, int row)
 			clearline(term.screen[1].buffer[i], term.c.attr, term.linelen, linelen);
 		}
 	}
-
 	/* Allocate all visible lines for regular line buffer */
-	for (j = term.screen[0].cur, i = 0; i < row; ++i, j = (j + 1) % term.screen[0].size) {
+	for (j = term.screen[0].cur, i = 0; i < row; ++i, j = (j + 1) % term.screen[0].size)
+	{
 		if (!term.screen[0].buffer[j]) {
 			term.screen[0].buffer[j] = xmalloc(linelen * sizeof(Glyph));
 		}
@@ -2750,12 +2726,11 @@ tresize(int col, int row)
 			clearline(term.screen[0].buffer[j], term.c.attr, 0, linelen);
 		}
 	}
-
 	/* Resize alt screen */
 	term.screen[1].cur = 0;
 	term.screen[1].size = row;
 	for (i = row; i < term.row; ++i) {
-		free(term.screen[i].buffer[i]);
+		free(term.screen[1].buffer[i]);
 	}
 	term.screen[1].buffer = xrealloc(term.screen[1].buffer, row * sizeof(Line));
 	for (i = term.row; i < row; ++i) {
@@ -2766,14 +2741,6 @@ tresize(int col, int row)
 	/* resize to new height */
 	term.dirty = xrealloc(term.dirty, row * sizeof(*term.dirty));
 	term.tabs = xrealloc(term.tabs, col * sizeof(*term.tabs));
-
-	for (i = 0; i < HISTSIZE; i++) {
-		term.hist[i] = xrealloc(term.hist[i], col * sizeof(Glyph));
-		for (j = mincol; j < col; j++) {
-			term.hist[i][j] = term.c.attr;
-			term.hist[i][j].u = ' ';
-		}
-	}
 
 	/* fix tabstops */
 	if (col > term.col) {

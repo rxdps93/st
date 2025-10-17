@@ -4,9 +4,8 @@ st is a simple terminal emulator for X which sucks less.
 
 Applied Patches
 ---------------
-> scrollback:       st-scrollback-0.9.2.diff
---> ringbuffer:     st-scrollback-ringbuffer-0.9.2.diff
-----> float:        st-scrollback-float-0.9.2.diff
+> scrollback-ringbuffer:    st-scrollback-ringbuffer-0.9.2.diff
+> scrollback-mouse:         st-scrollback-mouse-0.9.2.diff    
 
 Requirements
 ------------

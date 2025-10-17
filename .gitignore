@@ -1,0 +1,6 @@
+diffs/
+*.bak
+*.rej
+*.orig
+*.o
+st
