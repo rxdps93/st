@@ -8,6 +8,7 @@ Applied Patches
 > scrollback-mouse:         st-scrollback-mouse-0.9.2.diff    
 > anysize:                  st-anysize-20220718-baa718-baa9357.diff
 > alpha:                    st-alpha-20240814-a0274bc.diff
+> changealpha:              st-changealpha-20230519-b44f2ad.diff
 
 Requirements
 ------------
