@@ -7,6 +7,7 @@ Applied Patches
 > scrollback-ringbuffer:    st-scrollback-ringbuffer-0.9.2.diff
 > scrollback-mouse:         st-scrollback-mouse-0.9.2.diff    
 > anysize:                  st-anysize-20220718-baa718-baa9357.diff
+> alpha:                    st-alpha-20240814-a0274bc.diff
 
 Requirements
 ------------
