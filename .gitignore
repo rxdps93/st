@@ -4,3 +4,4 @@ diffs/
 *.orig
 *.o
 st
+config.h
